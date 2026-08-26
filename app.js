@@ -38,7 +38,7 @@ const normMonthly = (medianValue, baselineMaxDdPct) => {
 };
 
 function miniBars(signal) {
-  const rows = monthlyRows(signal);
+  const rows = monthlyRows(signal).slice(-16);
   const values = rows.filter(isValidReturn).map((row) => Number(row.return_pct));
   const max = Math.max(1, ...values.map(Math.abs));
 
@@ -57,7 +57,7 @@ function metricGrid(signal) {
 }
 
 function card(signal) {
-  return `<article class="card" role="button" tabindex="0" data-signal-id="${esc(signal.id)}" aria-label="Open details for ${esc(signal.name)}"><div class="top"><img class="avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div><div class="status">${esc((signal.status || 'WATCH').split('/')[0].trim())}</div></div>${metricGrid(signal)}<div class="fingerprint">${esc(signal.risk_fingerprint || '')}</div><div class="months">${miniBars(signal)}</div><div class="foot"><span>T0 ${esc(signal.t0_date || '2026-08-26')}</span><span>${signal.price_monthly_usd ? `$${esc(signal.price_monthly_usd)}/mo` : ''}</span></div></article>`;
+  return `<article class="card" role="button" tabindex="0" data-signal-id="${esc(signal.id)}" aria-label="Open details for ${esc(signal.name)}"><div class="top"><img class="avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div><div class="status">${esc((signal.status || 'WATCH').split('/')[0].trim())}</div></div>${metricGrid(signal)}<div class="fingerprint">${esc(signal.risk_fingerprint || '')}</div><div class="mini-chart-label">Last 16 months</div><div class="months">${miniBars(signal)}</div><div class="foot"><span>T0 ${esc(signal.t0_date || '2026-08-26')}</span><span>${signal.price_monthly_usd ? `$${esc(signal.price_monthly_usd)}/mo` : ''}</span></div></article>`;
 }
 
 function periodSummary(signal, periodType) {
