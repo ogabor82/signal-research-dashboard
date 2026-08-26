@@ -1,0 +1,4 @@
+{
+  "rewrites": [{"source": "/api/signals", "destination": "/api/signals.js"}],
+  "headers": [{"source": "/(.*)", "headers": [{"key": "X-Content-Type-Options", "value": "nosniff"}]}]
+}
