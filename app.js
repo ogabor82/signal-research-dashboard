@@ -6,6 +6,15 @@ const fmtPlain = (value, digits = 1) => {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(digits) : '—';
 };
+const fmtSmartPct = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `${Number.isInteger(n) ? n.toFixed(0) : n.toFixed(1)}%`;
+};
+const fmtMoney = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '—';
+};
 const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 let signals = [];
@@ -25,18 +34,24 @@ const isValidReturn = (row) =>
   row && row.return_pct != null && row.return_pct !== '' && Number.isFinite(Number(row.return_pct));
 const monthlyRows = (signal) =>
   [...(signal.monthly_returns || [])].sort((a, b) => Number(a.year) - Number(b.year) || Number(a.month) - Number(b.month));
-const median = (values) => {
-  const nums = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!nums.length) return null;
-  const mid = Math.floor(nums.length / 2);
-  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+const toTime = (value) => {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
 };
-const average = (values) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null);
-const normMonthly = (medianValue, baselineMaxDdPct) => {
-  const dd = Number(baselineMaxDdPct);
-  return Number.isFinite(medianValue) && Number.isFinite(dd) && dd > 0 ? medianValue * (20 / dd) : null;
+const formatDateLabel = (value) => {
+  const time = toTime(value);
+  if (time === null) return '—';
+  const date = new Date(time);
+  return `${monthNames[date.getUTCMonth()]} ${date.getUTCDate()}`;
 };
-
+const dateKey = (value) => {
+  const time = toTime(value);
+  return time === null ? '' : new Date(time).toISOString().slice(0, 10);
+};
+const snapshotRows = (signal) => {
+  const rows = signal.snapshots?.length ? signal.snapshots : signal.latest_snapshot ? [signal.latest_snapshot] : [];
+  return [...rows].sort((a, b) => (toTime(a.captured_at) || 0) - (toTime(b.captured_at) || 0));
+};
 function miniBars(signal) {
   const rows = monthlyRows(signal).slice(-16);
   const values = rows.filter(isValidReturn).map((row) => Number(row.return_pct));
@@ -58,32 +73,6 @@ function metricGrid(signal) {
 
 function card(signal) {
   return `<article class="card" role="button" tabindex="0" data-signal-id="${esc(signal.id)}" aria-label="Open details for ${esc(signal.name)}"><div class="top"><img class="avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div><div class="status">${esc((signal.status || 'WATCH').split('/')[0].trim())}</div></div>${metricGrid(signal)}<div class="fingerprint">${esc(signal.risk_fingerprint || '')}</div><div class="mini-chart-label">Last 16 months</div><div class="months">${miniBars(signal)}</div><div class="foot"><span>T0 ${esc(signal.t0_date || '2026-08-26')}</span><span>${signal.price_monthly_usd ? `$${esc(signal.price_monthly_usd)}/mo` : ''}</span></div></article>`;
-}
-
-function periodSummary(signal, periodType) {
-  const values = monthlyRows(signal)
-    .filter((row) => row.period_type === periodType && isValidReturn(row))
-    .map((row) => Number(row.return_pct));
-
-  if (!values.length) {
-    return { months: 0, median: null, average: null, positivePct: null, best: null, worst: null, norm: null };
-  }
-
-  const medianValue = median(values);
-  return {
-    months: values.length,
-    median: medianValue,
-    average: average(values),
-    positivePct: (values.filter((value) => value > 0).length / values.length) * 100,
-    best: Math.max(...values),
-    worst: Math.min(...values),
-    norm: normMonthly(medianValue, signal.baseline_max_dd_pct)
-  };
-}
-
-function summaryPanel(title, summary) {
-  const empty = summary.months === 0;
-  return `<section class="summary-panel"><div class="summary-title">${title}</div>${empty ? '<p class="no-data">No data yet</p>' : ''}<div class="summary-grid"><div><span>Months</span><b>${summary.months}</b></div><div><span>Median/mo</span><b>${fmt(summary.median)}</b></div><div><span>Average/mo</span><b>${fmt(summary.average)}</b></div><div><span>Positive months</span><b>${fmt(summary.positivePct, 0)}</b></div><div><span>Best month</span><b>${fmt(summary.best)}</b></div><div><span>Worst month</span><b>${fmt(summary.worst)}</b></div><div class="summary-wide"><span>${title === 'BASELINE' ? 'Baseline' : 'Forward'} NORM/MO</span><b>${fmt(summary.norm)}</b></div></div></section>`;
 }
 
 function chartBar(row, max) {
@@ -116,10 +105,60 @@ function monthlyChart(signal) {
   return `<section class="detail-section monthly-performance"><div class="section-head"><h3>Monthly Performance</h3><div class="legend"><span class="legend-historical">Historical</span><span class="legend-forward">Forward</span><span class="legend-negative">Negative</span></div></div><div class="detail-chart">${bars}${marker}</div>${hasForward ? '' : '<div class="forward-empty">No forward months yet</div>'}</section>`;
 }
 
+function trend(value, previous) {
+  const current = Number(value);
+  const prior = Number(previous);
+  if (!Number.isFinite(current) || !Number.isFinite(prior)) return '';
+  if (current > prior) return '<span class="trend up">↑</span>';
+  if (current < prior) return '<span class="trend down">↓</span>';
+  return '<span class="trend flat">→</span>';
+}
+
+function snapshotCell(value, previous, type = 'pct') {
+  const formatted = type === 'money' ? fmtMoney(value) : fmtSmartPct(value);
+  return `${formatted}${trend(value, previous)}`;
+}
+
+function monitoringSnapshots(signal) {
+  const t0Date = signal.t0_date || '2026-08-26';
+  const t0Key = dateKey(t0Date);
+  const snapshots = snapshotRows(signal);
+  const baselineSnapshot = snapshots.filter((row) => t0Key && dateKey(row.captured_at) <= t0Key).at(-1) || null;
+  const rows = [
+    {
+      label: `T0 &middot; ${formatDateLabel(t0Date)}`,
+      growth: signal.baseline_growth_pct,
+      equity: baselineSnapshot?.equity ?? baselineSnapshot?.balance,
+      maxDd: signal.baseline_max_dd_pct,
+      load: signal.baseline_deposit_load_pct,
+      winRate: signal.baseline_win_rate_pct,
+      algo: signal.baseline_algo_pct
+    },
+    ...snapshots
+      .filter((row) => !t0Key || dateKey(row.captured_at) > t0Key)
+      .map((row) => ({
+        label: formatDateLabel(row.captured_at),
+        growth: row.growth_pct,
+        equity: row.equity ?? row.balance,
+        maxDd: row.max_dd_pct,
+        load: row.deposit_load_pct,
+        winRate: row.win_rate_pct,
+        algo: row.algo_pct
+      }))
+  ];
+  const body = rows
+    .map((row, index) => {
+      const previous = rows[index - 1] || {};
+      return `<tr><th>${row.label}</th><td>${snapshotCell(row.growth, previous.growth)}</td><td>${snapshotCell(row.equity, previous.equity, 'money')}</td><td>${snapshotCell(row.maxDd, previous.maxDd)}</td><td>${snapshotCell(row.load, previous.load)}</td><td>${snapshotCell(row.winRate, previous.winRate)}</td><td>${snapshotCell(row.algo, previous.algo)}</td></tr>`;
+    })
+    .join('');
+  const empty = rows.length === 1 ? '<p class="snapshot-empty">No monitoring snapshots yet</p>' : '';
+
+  return `<section class="detail-section monitoring-section"><h3><code>Monitoring snapshots</code></h3><div class="snapshot-table-wrap"><table class="snapshot-table"><thead><tr><th>Date</th><th>Growth</th><th>Equity</th><th>Max DD</th><th>Load</th><th>Win rate</th><th>Algo</th></tr></thead><tbody>${body}</tbody></table></div>${empty}</section>`;
+}
+
 function detailView(signal) {
-  const baseline = periodSummary(signal, 'historical');
-  const forward = periodSummary(signal, 'forward');
-  return `<div class="modal-backdrop" data-close-detail></div><section class="detail-modal" role="dialog" aria-modal="true" aria-label="${esc(signal.name)} detail view"><button class="close-detail" type="button" data-close-detail aria-label="Close detail view">&times;</button><div class="detail-header"><div class="detail-topline"><img class="avatar detail-avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div></div><div class="detail-t0"><span>T0 baseline</span><b>${esc(signal.t0_date || '2026-08-26')}</b></div></div>${metricGrid(signal)}<div class="fingerprint detail-fingerprint">${esc(signal.risk_fingerprint || '')}</div>${monthlyChart(signal)}<section class="detail-section"><div class="summary-panels">${summaryPanel('BASELINE', baseline)}${summaryPanel('FORWARD', forward)}</div><p class="norm-note">Linear 20% DD scaling approximation: median monthly return x (20 / baseline max DD).</p></section></section>`;
+  return `<div class="modal-backdrop" data-close-detail></div><section class="detail-modal" role="dialog" aria-modal="true" aria-label="${esc(signal.name)} detail view"><button class="close-detail" type="button" data-close-detail aria-label="Close detail view">&times;</button><div class="detail-header"><div class="detail-topline"><img class="avatar detail-avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div></div><div class="detail-t0"><span>T0 baseline</span><b>${esc(signal.t0_date || '2026-08-26')}</b></div></div>${metricGrid(signal)}<div class="fingerprint detail-fingerprint">${esc(signal.risk_fingerprint || '')}</div>${monthlyChart(signal)}${monitoringSnapshots(signal)}</section>`;
 }
 
 function openDetail(id) {

@@ -48,6 +48,7 @@ export default async function handler(req, res) {
 
     const data = signals.map((s) => {
       const monthlyReturns = monthly.filter((m) => m.signal_id === s.id);
+      const signalSnapshots = snapshots.filter((x) => x.signal_id === s.id);
       const medianMonthly2026Pct = median(
         monthlyReturns
           .filter((m) => Number(m.year) === 2026)
@@ -62,7 +63,8 @@ export default async function handler(req, res) {
       return {
         ...s,
         monthly_returns: monthlyReturns,
-        latest_snapshot: snapshots.find((x) => x.signal_id === s.id) || null,
+        snapshots: signalSnapshots,
+        latest_snapshot: signalSnapshots[0] || null,
         median_monthly_2026_pct: medianMonthly2026Pct,
         normalized_monthly_20dd_pct: normalizedMonthly20DdPct
       };
