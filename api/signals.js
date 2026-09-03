@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     const [signals, monthly, snapshots] = await Promise.all([
       sb('signals?select=id,name,provider,t0_date,baseline_growth_pct,baseline_max_dd_pct,baseline_pf,baseline_win_rate_pct,baseline_deposit_load_pct,baseline_algo_pct,price_monthly_usd,category,status,priority,role,risk_fingerprint,avatar_url&order=id.asc'),
       sb('signal_monthly_returns?select=signal_id,year,month,return_pct,period_type,notes&order=year.asc,month.asc'),
-      sb('signal_snapshots?select=signal_id,captured_at,growth_pct,balance,equity,max_dd_pct,current_dd_pct,deposit_load_pct,pf,win_rate_pct,trades,algo_pct,subscribers,subscriber_funds,price_monthly_usd,status&order=captured_at.desc')
+      sb('signal_snapshots?select=signal_id,captured_at,growth_pct,balance,equity,max_dd_pct,current_dd_pct,current_month_return_pct,deposit_load_pct,pf,win_rate_pct,trades,algo_pct,subscribers,subscriber_funds,price_monthly_usd,status&order=captured_at.desc')
     ]);
 
     const data = signals.map((s) => {

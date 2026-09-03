@@ -129,6 +129,7 @@ function monitoringSnapshots(signal) {
       label: `T0 &middot; ${formatDateLabel(t0Date)}`,
       growth: signal.baseline_growth_pct,
       equity: baselineSnapshot?.equity ?? baselineSnapshot?.balance,
+      currentMonth: baselineSnapshot?.current_month_return_pct,
       maxDd: signal.baseline_max_dd_pct,
       load: signal.baseline_deposit_load_pct,
       winRate: signal.baseline_win_rate_pct,
@@ -140,6 +141,7 @@ function monitoringSnapshots(signal) {
         label: formatDateLabel(row.captured_at),
         growth: row.growth_pct,
         equity: row.equity ?? row.balance,
+        currentMonth: row.current_month_return_pct,
         maxDd: row.max_dd_pct,
         load: row.deposit_load_pct,
         winRate: row.win_rate_pct,
@@ -149,12 +151,12 @@ function monitoringSnapshots(signal) {
   const body = rows
     .map((row, index) => {
       const previous = rows[index - 1] || {};
-      return `<tr><th>${row.label}</th><td>${snapshotCell(row.growth, previous.growth)}</td><td>${snapshotCell(row.equity, previous.equity, 'money')}</td><td>${snapshotCell(row.maxDd, previous.maxDd)}</td><td>${snapshotCell(row.load, previous.load)}</td><td>${snapshotCell(row.winRate, previous.winRate)}</td><td>${snapshotCell(row.algo, previous.algo)}</td></tr>`;
+      return `<tr><th>${row.label}</th><td>${snapshotCell(row.growth, previous.growth)}</td><td>${snapshotCell(row.equity, previous.equity, 'money')}</td><td>${snapshotCell(row.currentMonth, previous.currentMonth)}</td><td>${snapshotCell(row.maxDd, previous.maxDd)}</td><td>${snapshotCell(row.load, previous.load)}</td><td>${snapshotCell(row.winRate, previous.winRate)}</td><td>${snapshotCell(row.algo, previous.algo)}</td></tr>`;
     })
     .join('');
   const empty = rows.length === 1 ? '<p class="snapshot-empty">No monitoring snapshots yet</p>' : '';
 
-  return `<section class="detail-section monitoring-section"><h3><code>Monitoring snapshots</code></h3><div class="snapshot-table-wrap"><table class="snapshot-table"><thead><tr><th>Date</th><th>Growth</th><th>Equity</th><th>Max DD</th><th>Load</th><th>Win rate</th><th>Algo</th></tr></thead><tbody>${body}</tbody></table></div>${empty}</section>`;
+  return `<section class="detail-section monitoring-section"><h3><code>Monitoring snapshots</code></h3><div class="snapshot-table-wrap"><table class="snapshot-table"><thead><tr><th>Date</th><th>Growth</th><th>Equity</th><th>Current month</th><th>Max DD</th><th>Load</th><th>Win rate</th><th>Algo</th></tr></thead><tbody>${body}</tbody></table></div>${empty}</section>`;
 }
 
 function detailView(signal) {
