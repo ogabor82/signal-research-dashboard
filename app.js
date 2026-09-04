@@ -1,21 +1,26 @@
 const fmt = (value, digits = 1) => {
+  if (value == null || value === '') return '—';
   const n = Number(value);
   return Number.isFinite(n) ? `${n.toFixed(digits)}%` : '—';
 };
 const fmtPlain = (value, digits = 1) => {
+  if (value == null || value === '') return '—';
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(digits) : '—';
 };
 const fmtSmartPct = (value) => {
+  if (value == null || value === '') return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return '—';
   return `${Number.isInteger(n) ? n.toFixed(0) : n.toFixed(1)}%`;
 };
 const fmtMoney = (value) => {
+  if (value == null || value === '') return '—';
   const n = Number(value);
   return Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '—';
 };
 const fmtSignedPct = (value) => {
+  if (value == null || value === '') return '—';
   const n = Number(value);
   return Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n.toFixed(1)}%` : '—';
 };
@@ -78,7 +83,7 @@ function miniBars(signal) {
 }
 
 function metricGrid(signal) {
-  return `<div class="metrics"><div class="metric"><b>${fmt(signal.baseline_growth_pct)}</b><span>Growth</span></div><div class="metric"><b>${fmt(signal.baseline_max_dd_pct)}</b><span>Max DD</span></div><div class="metric" title="2026 median monthly return scaled linearly to 20% max DD"><b>${fmt(signal.normalized_monthly_20dd_pct)}</b><span>NORM/MO</span></div><div class="metric"><b>${fmt(signal.baseline_win_rate_pct)}</b><span>Win rate</span></div><div class="metric"><b>${fmt(signal.baseline_deposit_load_pct)}</b><span>Load</span></div></div>`;
+  return `<div class="metrics"><div class="metric"><b>${fmt(signal.baseline_growth_pct)}</b><span>Growth</span></div><div class="metric" title="Worst observed relative drawdown used for conservative normalization"><b>${fmt(signal.baseline_max_dd_pct)}</b><span>MAX DD</span></div><div class="metric" title="Median of the 3 largest drawdown events"><b>${fmt(signal.baseline_robust_dd_pct)}</b><span>ROBUST DD</span></div><div class="metric" title="2026 median monthly return scaled linearly to 20% worst-case DD"><b>${fmt(signal.normalized_monthly_20dd_pct)}</b><span>NORM/MO</span></div><div class="metric" title="2026 median monthly return scaled linearly to 20% robust DD"><b>${fmt(signal.robust_normalized_monthly_20dd_pct)}</b><span>ROBUST NORM/MO</span></div><div class="metric"><b>${fmt(signal.baseline_win_rate_pct)}</b><span>Win rate</span></div><div class="metric"><b>${fmt(signal.baseline_deposit_load_pct)}</b><span>Load</span></div></div>`;
 }
 
 function latestSnapshotSummary(signal) {
@@ -217,8 +222,15 @@ function monitoringSnapshots(signal) {
   return `<section class="detail-section monitoring-section"><h3><code>Monitoring snapshots</code></h3><div class="snapshot-table-wrap"><table class="snapshot-table"><thead><tr><th>Date</th><th>Growth</th><th>Equity</th><th>Current month</th><th>Max DD</th><th>Load</th><th>Win rate</th><th>Algo</th></tr></thead><tbody>${body}</tbody></table></div>${empty}</section>`;
 }
 
+function tailRatioDetail(signal) {
+  if (signal.tail_ratio == null || signal.tail_ratio === '') return '';
+  const ratio = Number(signal.tail_ratio);
+  if (!Number.isFinite(ratio)) return '';
+  return `<div class="tail-ratio" title="Max DD divided by Robust DD. Higher values indicate a larger gap between the worst historical event and typical major drawdowns.">Tail ratio: <b>${ratio.toFixed(2)}&times;</b></div>`;
+}
+
 function detailView(signal) {
-  return `<div class="modal-backdrop" data-close-detail></div><section class="detail-modal" role="dialog" aria-modal="true" aria-label="${esc(signal.name)} detail view"><button class="close-detail" type="button" data-close-detail aria-label="Close detail view">&times;</button><div class="detail-header"><div class="detail-topline"><img class="avatar detail-avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div></div><div class="detail-t0"><span>T0 baseline</span><b>${esc(signal.t0_date || '2026-08-26')}</b></div></div>${metricGrid(signal)}<div class="fingerprint detail-fingerprint">${esc(signal.risk_fingerprint || '')}</div>${monthlyChart(signal)}${monitoringSnapshots(signal)}</section>`;
+  return `<div class="modal-backdrop" data-close-detail></div><section class="detail-modal" role="dialog" aria-modal="true" aria-label="${esc(signal.name)} detail view"><button class="close-detail" type="button" data-close-detail aria-label="Close detail view">&times;</button><div class="detail-header"><div class="detail-topline"><img class="avatar detail-avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div></div><div class="detail-t0"><span>T0 baseline</span><b>${esc(signal.t0_date || '2026-08-26')}</b></div></div>${metricGrid(signal)}<div class="fingerprint detail-fingerprint">${esc(signal.risk_fingerprint || '')}</div>${tailRatioDetail(signal)}${monthlyChart(signal)}${monitoringSnapshots(signal)}</section>`;
 }
 
 function openDetail(id) {
