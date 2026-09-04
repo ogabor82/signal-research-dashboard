@@ -22,6 +22,7 @@ const fmtSignedPct = (value) => {
 const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 let signals = [];
+const sortState = { key: 'norm', dir: 'desc' };
 
 const esc = (value) =>
   String(value ?? '')
@@ -94,6 +95,38 @@ function latestSnapshotSummary(signal) {
     : 'DD —';
   const ddClass = Number.isFinite(ddDiff) && Math.abs(ddDiff) >= 0.05 ? (ddDiff > 0 ? 'dd-up' : 'dd-down') : 'dd-flat';
   return `<div class="latest-summary">Latest: ${esc(latestDate)} · ${esc(monthLabel)} ${currentMonth} · <span class="${ddClass}">${ddText}</span></div>`;
+}
+
+function sortValue(signal) {
+  return Number(sortState.key === 'maxdd' ? signal.baseline_max_dd_pct : signal.normalized_monthly_20dd_pct);
+}
+
+function sortedSignals() {
+  return [...signals].sort((a, b) => {
+    const av = sortValue(a);
+    const bv = sortValue(b);
+    const aValid = Number.isFinite(av);
+    const bValid = Number.isFinite(bv);
+    if (!aValid && !bValid) return String(a.name || '').localeCompare(String(b.name || ''));
+    if (!aValid) return 1;
+    if (!bValid) return -1;
+    return sortState.dir === 'asc' ? av - bv : bv - av;
+  });
+}
+
+function sortButton(key, label, defaultDir) {
+  const active = sortState.key === key;
+  const dir = active ? sortState.dir : defaultDir;
+  const arrow = dir === 'asc' ? '↑' : '↓';
+  return `<button class="sort-btn ${active ? 'active' : ''}" type="button" data-sort="${key}" aria-pressed="${active}">${label} ${arrow}</button>`;
+}
+
+function sortControls() {
+  return `<div class="sort-controls"><span>Sort by</span>${sortButton('norm', 'NORM/MO', 'desc')}${sortButton('maxdd', 'MAX DD', 'asc')}</div>`;
+}
+
+function renderDashboard() {
+  document.getElementById('app').innerHTML = `${sortControls()}<div class="grid">${sortedSignals().map(card).join('')}</div>`;
 }
 
 function card(signal) {
@@ -204,6 +237,18 @@ function closeDetail() {
 
 function bindDashboard() {
   document.getElementById('app').addEventListener('click', (event) => {
+    const sortBtn = event.target.closest('.sort-btn[data-sort]');
+    if (sortBtn) {
+      const nextKey = sortBtn.dataset.sort;
+      if (sortState.key === nextKey) {
+        sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        sortState.key = nextKey;
+        sortState.dir = nextKey === 'maxdd' ? 'asc' : 'desc';
+      }
+      renderDashboard();
+      return;
+    }
     const cardEl = event.target.closest('.card[data-signal-id]');
     if (cardEl) openDetail(cardEl.dataset.signalId);
   });
@@ -229,7 +274,7 @@ fetch('/api/signals')
     document.body.insertAdjacentHTML('beforeend', '<div id="detail-root"></div>');
     bindDashboard();
     document.getElementById('count').textContent = `${signals.length} baselines`;
-    document.getElementById('app').innerHTML = `<div class="grid">${signals.map(card).join('')}</div>`;
+    renderDashboard();
   })
   .catch((error) => {
     document.getElementById('app').innerHTML = `<div class="error">${esc(error.message)}</div>`;
