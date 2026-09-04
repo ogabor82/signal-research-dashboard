@@ -15,6 +15,10 @@ const fmtMoney = (value) => {
   const n = Number(value);
   return Number.isFinite(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '—';
 };
+const fmtSignedPct = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n > 0 ? '+' : ''}${n.toFixed(1)}%` : '—';
+};
 const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 let signals = [];
@@ -44,6 +48,11 @@ const formatDateLabel = (value) => {
   const date = new Date(time);
   return `${monthNames[date.getUTCMonth()]} ${date.getUTCDate()}`;
 };
+const formatMonthLabel = (value) => {
+  const time = toTime(value);
+  if (time === null) return 'Current';
+  return monthNames[new Date(time).getUTCMonth()] || 'Current';
+};
 const dateKey = (value) => {
   const time = toTime(value);
   return time === null ? '' : new Date(time).toISOString().slice(0, 10);
@@ -71,8 +80,24 @@ function metricGrid(signal) {
   return `<div class="metrics"><div class="metric"><b>${fmt(signal.baseline_growth_pct)}</b><span>Growth</span></div><div class="metric"><b>${fmt(signal.baseline_max_dd_pct)}</b><span>Max DD</span></div><div class="metric" title="2026 median monthly return scaled linearly to 20% max DD"><b>${fmt(signal.normalized_monthly_20dd_pct)}</b><span>NORM/MO</span></div><div class="metric"><b>${fmt(signal.baseline_win_rate_pct)}</b><span>Win rate</span></div><div class="metric"><b>${fmt(signal.baseline_deposit_load_pct)}</b><span>Load</span></div></div>`;
 }
 
+function latestSnapshotSummary(signal) {
+  const snapshot = signal.latest_snapshot;
+  if (!snapshot) return '';
+  const latestDate = formatDateLabel(snapshot.captured_at);
+  const monthLabel = formatMonthLabel(snapshot.captured_at);
+  const currentMonth = fmtSignedPct(snapshot.current_month_return_pct);
+  const ddDiff = Number(snapshot.max_dd_pct) - Number(signal.baseline_max_dd_pct);
+  const ddText = Number.isFinite(ddDiff)
+    ? Math.abs(ddDiff) < 0.05
+      ? 'DD unchanged'
+      : `DD ${ddDiff > 0 ? '+' : ''}${ddDiff.toFixed(1)}pp`
+    : 'DD —';
+  const ddClass = Number.isFinite(ddDiff) && Math.abs(ddDiff) >= 0.05 ? (ddDiff > 0 ? 'dd-up' : 'dd-down') : 'dd-flat';
+  return `<div class="latest-summary">Latest: ${esc(latestDate)} · ${esc(monthLabel)} ${currentMonth} · <span class="${ddClass}">${ddText}</span></div>`;
+}
+
 function card(signal) {
-  return `<article class="card" role="button" tabindex="0" data-signal-id="${esc(signal.id)}" aria-label="Open details for ${esc(signal.name)}"><div class="top"><img class="avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div><div class="status">${esc((signal.status || 'WATCH').split('/')[0].trim())}</div></div>${metricGrid(signal)}<div class="fingerprint">${esc(signal.risk_fingerprint || '')}</div><div class="mini-chart-label">Last 16 months</div><div class="months">${miniBars(signal)}</div><div class="foot"><span>T0 ${esc(signal.t0_date || '2026-08-26')}</span><span>${signal.price_monthly_usd ? `$${esc(signal.price_monthly_usd)}/mo` : ''}</span></div></article>`;
+  return `<article class="card" role="button" tabindex="0" data-signal-id="${esc(signal.id)}" aria-label="Open details for ${esc(signal.name)}"><div class="top"><img class="avatar" src="${esc(signal.avatar_url || '')}" alt=""><div class="title"><h2>${esc(signal.name)}</h2><div class="provider">${esc(signal.provider || '—')}</div><div class="badges">${badge('priority', signal.priority)}${badge('role', signal.role)}</div></div><div class="status">${esc((signal.status || 'WATCH').split('/')[0].trim())}</div></div>${metricGrid(signal)}<div class="fingerprint">${esc(signal.risk_fingerprint || '')}</div><div class="mini-chart-label">Last 16 months</div><div class="months">${miniBars(signal)}</div>${latestSnapshotSummary(signal)}<div class="foot"><span>T0 ${esc(signal.t0_date || '2026-08-26')}</span><span>${signal.price_monthly_usd ? `$${esc(signal.price_monthly_usd)}/mo` : ''}</span></div></article>`;
 }
 
 function chartBar(row, max) {
